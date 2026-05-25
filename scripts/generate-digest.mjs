@@ -179,3 +179,53 @@ await callWithRetry(() =>
 );
 
 console.log(`Digest written to ${filePath}`);
+
+// --- Phase 6: Cleanup digests older than 30 days ---
+
+const RETENTION_DAYS = 30;
+const cutoffDate = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split('T')[0];
+
+console.log(`Cleaning up digests older than ${cutoffDate}...`);
+
+try {
+  const { data: files } = await callWithRetry(() =>
+    octokit.rest.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'digest',
+    })
+  );
+
+  const datePattern = /^(\d{4}-\d{2}-\d{2})\.md$/;
+  let deletedCount = 0;
+
+  for (const file of files) {
+    const match = file.name.match(datePattern);
+    if (!match) continue;
+
+    const fileDate = match[1];
+    if (fileDate >= cutoffDate) continue;
+
+    try {
+      await callWithRetry(() =>
+        octokit.rest.repos.deleteFile({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          path: `digest/${file.name}`,
+          message: `Cleanup: remove digest ${file.name} (older than ${RETENTION_DAYS} days)`,
+          sha: file.sha,
+        })
+      );
+      deletedCount++;
+      console.log(`  Deleted ${file.name}`);
+    } catch (err) {
+      console.warn(`  Failed to delete ${file.name}: ${err.message}`);
+    }
+  }
+
+  console.log(`Cleanup done. Deleted ${deletedCount} old digest(s).`);
+} catch (err) {
+  console.warn(`Cleanup skipped: ${err.message}`);
+}
