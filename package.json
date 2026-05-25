@@ -1,0 +1,12 @@
+{
+  "name": "github-trending-digest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily digest of trending GitHub repositories",
+  "scripts": {
+    "generate": "node scripts/generate-digest.mjs"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0"
+  }
+}
